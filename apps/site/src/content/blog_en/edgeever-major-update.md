@@ -1,86 +1,72 @@
 ---
 draft: false
-title: "EdgeEver capability overview: Cloudflare self-hosting, Open API, and MCP"
-snippet: "A current product overview based on the EdgeEver README, docs, and implementation structure."
+title: "EdgeEver Product Capability Overview: Cross-Platform Apps, Flexible Deploy, Dual-Protocol AI & Visual Diagram Notes"
+snippet: "A comprehensive product overview based on the latest EdgeEver README, architecture docs, and implementation, covering ACP/MCP AI synergy, visual diagrams, and open data."
 image: {
     src: "/images/major-update.jpg",
     alt: "EdgeEver product capability overview"
 }
-publishDate: "2026-07-02 00:40"
+publishDate: "2026-09-30 12:00"
 category: "Product"
 author: "EdgeEver Team"
-tags: [updates, pwa, mcp, editor]
+tags: [updates, cross-platform, docker, acp, mcp, companion, diagram, creator]
 ---
 
-This article reflects the capabilities that are already explicit in the core repository. EdgeEver is an open source, self-hosted, Cloudflare-native notes workspace. It keeps the familiar three-column experience from classic Evernote-style tools while adding a REST API, OpenAPI schema, and Remote MCP endpoint.
+EdgeEver is a modern, open-source notes workspace. It brings back the familiar, high-efficiency three-pane experience from classic Evernote, while providing an open data architecture, native ACP/MCP dual-protocol AI synergy, visual diagram notes, and flexible self-hosted deployments.
 
-The summary below is based on the README, documentation, and implementation structure in the core `edgeever` repository.
+The summary below is based on the latest README, architecture documentation, and codebase structure in the `edgeever` repository.
 
 ---
 
-### 1. Classic three-column notes workspace
+### 1. Flexible Deployment: Cloudflare Serverless & Docker
 
-EdgeEver keeps a familiar workspace layout:
+EdgeEver supports two modern self-hosting options from the same codebase:
 
-- Notebook tree
-- Note list
-- Main editor
+- **Cloudflare Serverless Deployment**: 100% free serverless architecture running entirely within Cloudflare Workers, D1, and R2 free tiers (accommodating ~150,000 short notes and ~50,000 images) with zero server bills and zero maintenance.
+- **1-Line Docker Self-Hosting**: Official container images hosted on GHCR, deployable via `curl -fsSL https://edgeever.org/install.sh | bash` on your VPS, NAS, or home server with scalable storage for millions of notes and large attachments.
 
-It supports deeply nested notebooks, drag-and-drop notebook sorting and hierarchy changes, moving multiple notes, merging multiple notes, and rich text editing.
+### 2. Dual-Protocol Native AI Synergy: Companion Sidebar, Local ACP Agents & Remote MCP
 
-### 2. Open content model
+EdgeEver provides a comprehensive personal knowledge AI synergy matrix:
 
-EdgeEver stores content in three forms:
+- **Desktop ACP (Agent Client Protocol) Direct Local Agent Connection**: Desktop connects directly to locally running AI Agents via standard ACP (such as Codex, Antigravity, Claude Code, WorkBuddy, DeepSeek Harness, pi agent, etc.) without cloud relay, delivering zero-latency, deep-context collaborative writing.
+- **Persistent AI Companion Sidebar**: Completely replaces legacy dialogs, supporting multi-chat switching and instant action on note text or selections (summarize, explain, translate, proofread, and rewrite).
+- **Built-in Remote MCP Endpoint**: Built-in Model Context Protocol endpoint and stdio bridge authorizing external AI Agents to safely read, create, and organize notes.
+- **Connect Your Own Models**: Support for OpenAI, Anthropic Claude, Google Gemini, DeepSeek, and custom compatible endpoints.
 
-```text
-content_json      TipTap/ProseMirror document, the editor's source of truth
-content_markdown  API, Agent, import, and export format
-content_text      Search, excerpt, and indexing format
-```
+### 3. Visual Diagram Notes & Creator Tools
 
-This lets the web editor, REST API, MCP, import/export tooling, and search index each use the most suitable representation.
+- **Native Visual Diagram Notes**: Ditch external drawing tools and sketch mind maps, flowcharts, and architecture diagrams directly in notes. Backed by a structured IR, the built-in assistant and external AI agents can generate and refine diagrams from a single prompt, complete with smart auto-layout, cross-device sync, and vector export.
+- **One-Click Styled Rich Copy**: Converts Markdown into beautifully styled HTML with inline CSS, ready to paste directly into Substack, Medium, or newsletters.
+- **Note Appearance & Custom CSS**: Independent font size, line height, and palette settings per note, with light/dark custom CSS presets and side-by-side preview.
+- **Mermaid Diagrams & KaTeX Math**: Native rendering for architecture diagrams, sequence charts, and LaTeX equations while preserving editable source code.
+- **PDF Preview & Universal Attachments**: Inline PDF document previews alongside Office files, archives, audio, and video attachments.
 
-### 3. Cloudflare-native self-hosting
+### 4. All-Platform Native Apps & Multi-Device Sync
 
-The current deployment target is a Cloudflare Worker:
+Break free from commercial "2-device login limits" with a self-hosted API that synchronizes across all your devices:
 
-- `/api/*` is handled by the Hono API
-- Frontend static assets are served by Workers Assets
-- D1 stores notebook, memo, memo content, and resource metadata
-- R2 stores images and attachment objects
+- **macOS Desktop App**: Electron + Rust sidecar + SQLite local data service for instant local performance, ACP local agent synergy, offline editing, and full-screen focus mode; switching notes does not retain cached images/documents, keeping memory light and responsive.
+- **Windows x64 Desktop App**: Local SQLite mirror, automatic updates, and Windows Explorer right-click "Send to EdgeEver" system integration.
+- **Linux Desktop App**: Linux x86_64 AppImage preview distribution with in-app cross-version update support.
+- **iOS Native App**: Built with pure SwiftUI (iOS 17+), published on the App Store, integrating TipTap EditorBundle and local SQLite sync via GRDB, supporting share-sheet clipping and undo/redo.
+- **Android App**: Available on Google Play and signed APKs on GitHub Releases, featuring offline capture, share-sheet clipping, and undo/redo.
+- **Web Clipper Extension**: Available on Chrome Web Store, Microsoft Edge Add-ons, and Firefox Add-ons for clipping articles, selections, right-click images, and X (Twitter) posts.
 
-The core README gives a personal-use estimate of roughly 150,000 short notes or about 50,000 200 KB images. Actual usage and cost still depend on your Cloudflare account plan and Cloudflare's current pricing.
+### 5. Classic Three-Pane Layout, Dual View & Focus Mode
 
-### 4. Browser-side image compression and PWA
+- **Classic Three-Pane**: Notebook tree, note list, and main editor with zero learning curve.
+- **Rich Text / Markdown Dual View**: Switch seamlessly between TipTap rich text and Markdown source on desktop.
+- **Unlimited Nesting & Batch Operations**: Deeply nested notebooks, drag-and-drop reorganization, and multi-note batch move or merge.
+- **Revision History**: Automatic version tracking with instant review and rollback.
+- **Public Note Sharing**: Share notes publicly with optional auto-generated passwords; shared note pages support double-click image zooming.
 
-Before upload, the web app can compress PNG, JPEG, WebP, and AVIF images locally in the browser, convert them to WebP, and limit the longest side to `2560px`. If the compressed file is not smaller than the original, EdgeEver keeps the original file. The server does not perform Cloudflare Images-style processing.
+### 6. Data Sovereignty, Multi-Account Workspaces & Lossless Migration
 
-EdgeEver also supports PWA installation. The frontend uses Workbox and Dexie for offline drafts and a local sync queue.
+- **Isolated User Workspaces**: Single instance supports multiple independent user accounts with isolated data and MCP tokens.
+- **Lossless ZIP Backup & Restore**: One-click export including Markdown, Front Matter, nested hierarchies, attachments, and revision history for cross-instance recovery.
+- **Smooth Migration Tools**: Built-in migration scripts and step-by-step guides for Evernote (ENEX / evernote-backup), Memos, Notion, and Flomo.
+- **Client-Side Image Compression**: Silently compresses images in the browser before upload (saving 50%-90% storage).
+- **Official Plugin Platform**: Extend EdgeEver via rich plugin APIs with sandboxed permissions and declarative settings.
 
-### 5. REST API, OpenAPI, and MCP
 
-EdgeEver provides:
-
-- REST API
-- `/api/openapi.json`
-- Remote MCP endpoint
-- CLI and MCP stdio bridge scripts
-
-After creating an API token in the MCP settings card in the EdgeEver profile area, you can copy the token or the full MCP configuration and give it to an AI Agent so it can read and organize your notes.
-
-### 6. Updating to the latest version
-
-If you deployed from a fork:
-
-1. Open your own EdgeEver fork on GitHub.
-2. Click **Sync fork** on GitHub to sync the latest code from upstream.
-3. Return to your local project and redeploy:
-
-```sh
-git pull
-bun install
-bun run deploy:doctor
-bun run deploy
-```
-
-Syncing the fork only updates the code in GitHub. It does not automatically update the instance already deployed on Cloudflare. You still need to run the deployment command again.

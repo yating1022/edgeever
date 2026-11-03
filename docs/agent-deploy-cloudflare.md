@@ -1,154 +1,53 @@
-# AI Agent Cloudflare Deployment
+# AI Agent Cloudflare Deployment Guide
 
-This document is the deployment contract for AI agents. If a user asks an agent to deploy EdgeEver from a GitHub URL to Cloudflare, follow this runbook before asking the user for anything.
+This document defines the standard operating specifications and conventions for AI Agents (and automated deployment scripts) deploying EdgeEver on Cloudflare.
 
-## One Prompt Install
+> 💡 **Core Principle**: Pure Serverless architecture running entirely within Cloudflare free limits—no VPS or server purchasing, no Docker or SSL certificate configuration required.
 
-Users should be able to start with only this prompt:
+---
 
-```text
-This is the GitHub project URL: <repo-url>. Install and deploy this project to Cloudflare for me.
-```
+## Standard Automated Deployment Steps
 
-Chinese version:
+1. **Fork Repository**
+   - Fork `tianma-if/edgeever` to the target GitHub account.
 
-```text
-这个是 GitHub 上的项目链接：<repo-url>。请把这个项目安装部署到 Cloudflare 上。
-```
+2. **Create Cloudflare Resources**
+   - Create a D1 database named exactly `edgeever`.
+   - Create an R2 bucket named exactly `edgeever-resources`.
 
-## Agent Rules
+3. **Create the Worker**
+   - In **Workers & Pages** → **Create application** → **Start with Hello World!**, create and deploy a Worker named exactly `edgeever`.
+   - This is a placeholder service, not a completed EdgeEver deployment. For an existing EdgeEver instance, reuse its Worker and authentication Secret; do not replace its application with Hello World or reset its password.
 
-- Read `AGENTS.md`, `README.md`, `.env.local.example`, and this file first.
-- Do not create a new Git branch. Work on `main`.
-- Prefer `bun run deploy:setup`, `bun run deploy:doctor`, and `bun run deploy` for initial installation. Then connect the Worker to Cloudflare Workers Builds for all routine updates.
-- Do not hard-code a personal Worker name, D1 database ID, R2 bucket name, account ID, API token, or domain in source files.
-- Use `.env.local` for local/private deployment values. It is git-ignored.
-- If the Cloudflare MCP or Cloudflare plugin is available, it may be used to inspect or create resources. If not, use Wrangler through the scripts in this repo.
-- Ask the user only for values that cannot be inferred or generated safely, such as Cloudflare authorization, the first login password, or custom domain ownership.
+4. **Configure the Runtime Secret Before Connecting the Fork**
+   - Under the Worker's **Settings** → **Variables and Secrets**, add `EDGE_EVER_AUTH_PASSWORD` as type **Secret**, using the initial administrator login password (preferably at least 32 characters), and select **Deploy**.
+   - Confirm the Secret name appears in the list before connecting the repository. Keep the password only as a Worker runtime Secret, never in Workers Builds variables or Fork files.
 
-## Required Tools
+5. **Connect the Fork**
+   - Open this existing Worker's **Settings** → **Builds** → **Connect**, authorize GitHub access, and select the Fork's `main` branch. Follow [Cloudflare's existing-Worker instructions](https://developers.cloudflare.com/workers/ci-cd/builds/#connect-an-existing-worker). Do not use the Deploy to Cloudflare template entrypoint or create a Pages application.
+   - Use the repository root and default deploy command `npx wrangler deploy`; Cloudflare runs it online through EdgeEver's validated deployment pipeline. Existing deployments may keep explicit `bun run build:cloudflare` and `bun run deploy:cloudflare-builds` commands.
+   - Do not edit `wrangler.toml` or add duplicate bindings. Deployment automatically resolves the D1 UUID from `edgeever` and generates temporary `DB` and `RESOURCES` bindings. For a different database name, set `EDGE_EVER_D1_DATABASE_NAME`; use `EDGE_EVER_D1_DATABASE_ID` only if UUID discovery is unavailable. Non-secret instance settings belong in Workers Builds variables.
+   - Existing deployments retain their live `RESOURCES` binding and administrator username unless explicitly overridden; do not ask users to rename or reconfigure a custom R2 bucket. Keep tracked configuration unchanged so the Fork remains a deployment mirror.
 
-- Bun
-- Wrangler, installed by `bun install` as a project dev dependency
-- A Cloudflare account authorized by either `wrangler login` or `CLOUDFLARE_API_TOKEN`
+6. **Configure Deployment Permissions**
+   - In **Settings → Builds → API token**, select or create the Cloudflare API token used by Workers Builds to deploy the application. **Create new token** generates a token automatically; its defaults may lack D1. Add D1 read/edit permission for the target account under [My Profile → API Tokens](https://dash.cloudflare.com/profile/api-tokens), retaining its existing deployment permissions. Select this token in the Worker’s **Settings → Builds → API token** and save the build settings. Subsequent Cloudflare Workers Builds runs use it for database migrations and Worker deployment.
 
-## Standard Flow
+7. **Start the First Build and Verify the Service**
+   - Use `admin` unless the user requests another username; configure `EDGE_EVER_AUTH_USERNAME` before starting the first build if requested.
+   - In the Fork's GitHub repository, open **Actions → Update deployed EdgeEver**, enable the workflow if prompted, select `main`, and click **Run workflow**. This republishes the selected upstream version even when the Fork is already aligned. Return to Cloudflare **Deployments** to monitor the corresponding build.
+   - Missing authentication configuration is a deployment error to correct, not an expected first-build failure. Keep all authentication and deployment checks enabled.
+   - After confirming in Cloudflare that the corresponding build succeeded and deployment completed, verify `/api/health` returns HTTP `200` with `{"ok": true}`, `/api/openapi.json` is reachable with JSON containing `"ok": true`, and the login API accepts the configured administrator username and password. A Hello World response does not pass verification.
 
-1. Clone the repository and enter it.
+   - This workflow will automatically sync future stable releases and fixes.
 
-   ```sh
-   git clone <repo-url>
-   cd edgeever
-   ```
+## Upstream Update Channel
+   - An ordinary Fork is a deployment mirror by default. No update variable is required: the workflow applies the selected upstream Release's product snapshot to `main` before triggering Cloudflare.
+   - The updater preserves the Fork's complete `.github/workflows/**` directory and its two updater helper scripts as a stable local bootstrap layer. Official packaging, signing, testing, and Release workflows remain guarded to `tianma-if/edgeever` and are never rewritten by downstream product updates.
+   - Only a Fork that intentionally maintains application-code changes should create the Actions repository variable `EDGE_EVER_PRESERVE_FORK_CHANGES=true`. This opts into merges and requires the owner to resolve future conflicts; it is not needed for normal deployments.
+   - Open the job **Summary** and confirm it reports Fork mode `mirror`, the upstream target (stable Release or edge `main`), and either an update publish or an explicit *already aligned* result.
+   - Confirm Cloudflare **Deployments** builds the published `main` commit when a push occurred.
+   - Do not edit deployment files or rely on GitHub **Sync fork** for routine upgrades; the workflow is the only synchronization path needed by a normal deployment Fork. Use **Sync fork** once only when an old Fork must receive a newer updater workflow itself, then return to **Update deployed EdgeEver**.
 
-2. Install dependencies.
+## Optional: Customize the Initial Administrator Username
 
-   ```sh
-   bun install
-   ```
-
-3. Ensure Cloudflare authentication.
-
-   ```sh
-   bunx wrangler whoami
-   ```
-
-   If this fails, ask the user to finish Cloudflare login or provide a suitable API token. Do not continue deployment until this works.
-
-4. Prepare deployment resources and `.env.local`.
-
-   If the user gave a first login password, run:
-
-   ```sh
-   EDGE_EVER_PASSWORD='<first-login-password>' bun run deploy:setup
-   ```
-
-   If no password was provided, ask for one or ask permission to generate a random password. Then rerun the command with `EDGE_EVER_PASSWORD`.
-
-   `deploy:setup` will:
-
-   - copy `.env.local.example` to `.env.local` when needed
-   - reuse or create the D1 database
-   - create the R2 buckets when needed
-   - generate `EDGE_EVER_AUTH_PASSWORD_HASH` from `EDGE_EVER_PASSWORD`
-
-5. Check the deployment inputs.
-
-   ```sh
-   bun run deploy:doctor
-   ```
-
-   Fix every `fail` result before deploying.
-
-6. Deploy.
-
-   ```sh
-   bun run deploy
-   ```
-
-   `bun run deploy` builds the web app, applies remote D1 migrations, and deploys the Worker. During deploy, `scripts/run-wrangler.mjs` uploads `EDGE_EVER_AUTH_PASSWORD_HASH` as a Worker Secret via a generated `.env.wrangler.generated*.secrets` file, then synchronizes it again with `wrangler secret put` after a successful deployment so the first login does not depend on the bulk secrets upload alone.
-
-7. Verify the result.
-
-   Use the Worker URL from Wrangler output, then check:
-
-   ```sh
-   curl -I https://<worker-url>/
-   curl https://<worker-url>/api/openapi.json
-   ```
-
-   Open the site, log in with `EDGE_EVER_AUTH_USERNAME` and the first login password, then create an MCP token from the in-app MCP settings.
-
-8. Connect Cloudflare Workers Builds.
-
-   Prefer the automated setup command:
-
-   ```sh
-   bun run deploy:builds:setup
-   ```
-
-   It reads the fork remote and `.env.local`, then creates or updates the Cloudflare repository connection, production trigger, build commands, cache, watch paths, and build variables. The configuration API requires a **User API Token** (`My Profile` -> `API Tokens`), not an Account API Token; set it as `EDGE_EVER_BUILDS_API_TOKEN`. The agent should complete the Cloudflare GitHub App authorization in the browser when available. If Cloudflare requires a build-token choice, use the exact Dashboard path and retry command shown in [Cloudflare Workers Builds](cloudflare-workers-builds.md).
-
-   Once connected, a GitHub **Sync fork** push automatically migrates and deploys the user's own instance. Do not configure the repository's GitHub Actions Worker deployment for this purpose.
-
-## Optional Customization
-
-Set these values in `.env.local` before `bun run deploy:setup` or `bun run deploy`:
-
-```sh
-EDGE_EVER_WORKER_NAME=edgeever
-EDGE_EVER_D1_DATABASE_NAME=edgeever
-EDGE_EVER_R2_BUCKET_NAME=edgeever-resources
-EDGE_EVER_R2_PREVIEW_BUCKET_NAME=edgeever-resources-preview
-EDGE_EVER_AUTH_USERNAME=admin
-EDGE_EVER_SESSION_TTL_DAYS=400
-EDGE_EVER_CUSTOM_DOMAIN=notes.example.com
-```
-
-For multiple instances, set `EDGE_EVER_INSTANCE=<name>` and use scoped variables such as:
-
-```sh
-EDGE_EVER_PROD_WORKER_NAME=edgeever-prod
-EDGE_EVER_PROD_D1_DATABASE_ID=<database-id>
-EDGE_EVER_PROD_R2_BUCKET_NAME=edgeever-prod-resources
-EDGE_EVER_PROD_AUTH_PASSWORD_HASH=<password-hash>
-```
-
-## Blocking Conditions
-
-Stop and ask the user only when:
-
-- Cloudflare authentication is missing and the agent cannot open or complete login.
-- The user must choose or provide the first login password.
-- The requested custom domain is not available in the Cloudflare account.
-- Resource creation fails because of account limits, permissions, billing, or conflicting names that cannot be resolved by choosing a new name.
-
-## Final User Response
-
-After deployment, report:
-
-- deployed URL
-- login username
-- whether the password was user-provided or generated
-- where to create the EdgeEver MCP token in the app
-- any custom domain or Cloudflare DNS step that remains
+Ordinary deployments use the default username `admin`; do not proactively ask the user whether to change it. Only when the user explicitly requests a custom administrator username, set `EDGE_EVER_AUTH_USERNAME` in Workers Builds variables before starting the first build and use that username during login verification. Changing only this variable after the administrator account exists does not rename that account.

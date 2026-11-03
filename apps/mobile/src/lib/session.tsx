@@ -1,9 +1,23 @@
 import { createEdgeEverClient } from "@edgeever/client";
-import type { AuthUser } from "@edgeever/shared";
+import { resolveInstanceUrlInput, type AuthUser } from "@edgeever/shared";
+import { useQueryClient } from "@tanstack/react-query";
+import { fetch as expoFetch } from "expo/fetch";
 import * as SecureStore from "expo-secure-store";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { MISSING_MOBILE_SESSION_MESSAGE } from "./login-error";
 
 const SESSION_KEY = "edgeever.mobile.session";
+const DEVICE_ID_KEY = "edgeever.mobile.device-id";
+
+const getOrCreateDeviceId = async () => {
+  const existing = await SecureStore.getItemAsync(DEVICE_ID_KEY);
+  if (existing) return existing;
+
+  const randomPart = `${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
+  const deviceId = `mobile-${Date.now().toString(36)}-${randomPart}`;
+  await SecureStore.setItemAsync(DEVICE_ID_KEY, deviceId);
+  return deviceId;
+};
 
 export type MobileSession = {
   baseUrl: string;
@@ -15,13 +29,14 @@ type SessionContextValue = {
   isLoading: boolean;
   session: MobileSession | null;
   client: ReturnType<typeof createEdgeEverClient> | null;
-  signIn: (input: { baseUrl: string; username: string; password: string }) => Promise<void>;
+  signIn: (input: { baseUrl: string; username: string; password: string; locale?: string }) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
 const SessionContext = createContext<SessionContextValue | null>(null);
 
 export const SessionProvider = ({ children }: { children: ReactNode }) => {
+  const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(true);
   const [session, setSession] = useState<MobileSession | null>(null);
 
@@ -55,23 +70,29 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     return createEdgeEverClient({
       baseUrl: session.baseUrl,
       token: session.token,
+      fetch: expoFetch as typeof fetch,
+      directAiGeneration: true,
       onUnauthorized: () => {
+        queryClient.clear();
         setSession(null);
         void SecureStore.deleteItemAsync(SESSION_KEY);
       },
     });
-  }, [session]);
+  }, [queryClient, session]);
 
-  const signIn = useCallback(async (input: { baseUrl: string; username: string; password: string }) => {
-    const baseUrl = normalizeInstanceUrl(input.baseUrl);
-    const loginClient = createEdgeEverClient({ baseUrl });
+  const signIn = useCallback(async (input: { baseUrl: string; username: string; password: string; locale?: string }) => {
+    const baseUrl = normalizeInstanceUrl(resolveInstanceUrlInput(input.baseUrl));
+    const deviceId = await getOrCreateDeviceId();
+    const loginClient = createEdgeEverClient({ baseUrl, fetch: expoFetch as typeof fetch });
     const authSession = await loginClient.login({
       username: input.username,
       password: input.password,
+      deviceId,
+      locale: input.locale,
     });
 
     if (!authSession.authenticated || !authSession.sessionToken) {
-      throw new Error("登录成功但服务端没有返回移动端会话。请确认服务端已更新到支持 App 登录的版本。");
+      throw new Error(MISSING_MOBILE_SESSION_MESSAGE);
     }
 
     const nextSession: MobileSession = {
@@ -80,18 +101,20 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       user: authSession.user,
     };
 
+    queryClient.clear();
     await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(nextSession));
     setSession(nextSession);
-  }, []);
+  }, [queryClient]);
 
   const signOut = useCallback(async () => {
     if (client) {
       await client.logout().catch(() => undefined);
     }
 
+    queryClient.clear();
     await SecureStore.deleteItemAsync(SESSION_KEY);
     setSession(null);
-  }, [client]);
+  }, [client, queryClient]);
 
   const value = useMemo(
     () => ({

@@ -1,7 +1,7 @@
 ---
 draft: false
-title: "Guide to migrating from Evernote to EdgeEver"
-snippet: "Migrate notes you own into a self-hosted EdgeEver instance with EdgeEver MCP, evernote-backup, and the ENEX import script."
+title: "How to migrate from Evernote to a self-hosted notes app: EdgeEver ENEX guide"
+snippet: "Use ENEX, evernote-backup, and EdgeEver MCP to preserve notes, attachments, timestamps, and nested notebooks."
 image: {
     src: "/images/evernote-migration.jpg",
     alt: "Migrating from Evernote to EdgeEver"
@@ -15,6 +15,14 @@ tags: [evernote, migration, self-hosted, mcp]
 > EdgeEver is not affiliated with, endorsed by, or sponsored by Evernote. This guide only explains how users can migrate data they own into EdgeEver. Evernote is a trademark of its respective owner.
 
 We recommend using an AI coding assistant, such as Antigravity, Claude Code, Cursor, or a similar tool, to automate the migration. The migration guide in the core repository notes that the approach includes streaming memory optimization and empty-text preprocessing, supports very large note libraries, and preserves created/updated timestamps plus nested notebook hierarchy.
+
+If you are still comparing self-hosted Evernote alternatives, start with the [EdgeEver category page](/en/self-hosted-evernote-alternative), then follow the steps below.
+
+### FAQ
+
+- **Does this keep notebooks, attachments, and timestamps?** The documented flow preserves created/updated timestamps and nested notebook hierarchy. Spot-check notes with images after import.
+- **Do I have to use an AI assistant?** It is recommended, not required. You can download `scripts/import-evernote-enex-via-mcp.mjs` and follow the comments at the top of the script.
+- **Is EdgeEver affiliated with Evernote?** No. This guide only covers data you already own.
 
 ---
 

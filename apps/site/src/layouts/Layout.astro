@@ -1,8 +1,18 @@
 ---
 import { SEO } from "astro-seo";
+import { getImage } from "astro:assets";
+import heroProductImage from "@/assets/edgeever-hero-product.png";
 import Footer from "@/components/footer.astro";
 import Navbar from "@/components/navbar/navbar.astro";
-import { getLocalizedPath, getSiteLocale, siteCopy, siteLocaleDataAttribute, siteLocaleStorageKey } from "@/i18n";
+import {
+  getLocalizedPath,
+  getSiteLocale,
+  siteCopy,
+  siteLocaleDataAttribute,
+  siteLocalePrefixes,
+  siteLocales,
+  siteLocaleStorageKey,
+} from "@/i18n";
 import "@fontsource-variable/inter/index.css";
 import "@fontsource-variable/bricolage-grotesque";
 import "../styles/global.css";
@@ -26,15 +36,31 @@ export interface Props {
 const canonicalURL = new URL(Astro.url.pathname, Astro.site).toString();
 const locale = getSiteLocale(Astro.url.pathname);
 const copy = siteCopy[locale].layout;
-const zhAlternateURL = new URL(getLocalizedPath("zh-CN", Astro.url.pathname), Astro.site).toString();
-const enAlternateURL = new URL(getLocalizedPath("en-US", Astro.url.pathname), Astro.site).toString();
+const localeAlternateUrls = Object.fromEntries(
+  siteLocales.map((item) => [
+    item,
+    new URL(getLocalizedPath(item, Astro.url.pathname), Astro.site).toString(),
+  ]),
+) as Record<(typeof siteLocales)[number], string>;
+const zhAlternateURL = localeAlternateUrls["zh-CN"];
+const enAlternateURL = localeAlternateUrls["en-US"];
+const jaAlternateURL = localeAlternateUrls.ja;
+const plAlternateURL = localeAlternateUrls.pl;
 
 const defaultDescription = copy.defaultDescription;
+// Build a content-hashed JPEG so crawlers can fetch a fresh branded preview.
+const defaultShareImage = await getImage({
+  src: heroProductImage,
+  width: 1200,
+  height: 630,
+  fit: "contain",
+  format: "jpg",
+});
 
 const {
   title,
   description = defaultDescription,
-  image = "/opengraph.jpg",
+  image = defaultShareImage.src,
   imageAlt = copy.imageAlt,
   openGraphType = "website",
   articlePublishedTime,
@@ -47,29 +73,30 @@ const {
   localeRedirect = true,
 } = Astro.props;
 
-const resolvedImageWithDomain = new URL(image, Astro.site).toString();
+const resolvedImageWithDomain = new URL(
+  image === "/opengraph.jpg" ? defaultShareImage.src : image,
+  Astro.site,
+).toString();
 
 const makeTitle = title
   ? title + " | " + "EdgeEver"
   : copy.defaultTitle;
 
-const faviconVersion = "edgeever-brand-20260703";
+const faviconVersion = "edgeever-open-cat-20260809";
 const localeRedirectScript = `(() => {
   const storageKey = ${JSON.stringify(siteLocaleStorageKey)};
   const localeAttribute = ${JSON.stringify(siteLocaleDataAttribute)};
-  const supportedLocales = ["zh-CN", "en-US"];
+  const supportedLocales = ${JSON.stringify(siteLocales)};
+  const prefixes = ${JSON.stringify(siteLocalePrefixes)};
+  const prefixPattern = /^\\/(en|ja|pl)(?=\\/|$)/;
   const normalizeLocale = (locale) => {
     if (!locale) return null;
-    const normalized = String(locale).toLowerCase();
+    const normalized = String(locale).trim().replaceAll("_", "-").toLowerCase();
 
-    if (normalized === "zh" || normalized.startsWith("zh-")) {
-      return "zh-CN";
-    }
-
-    if (normalized === "en" || normalized === "en-us" || normalized.startsWith("en-")) {
-      return "en-US";
-    }
-
+    if (normalized === "zh" || normalized.startsWith("zh-")) return "zh-CN";
+    if (normalized === "en" || normalized.startsWith("en-")) return "en-US";
+    if (normalized === "ja" || normalized.startsWith("ja-")) return "ja";
+    if (normalized === "pl" || normalized.startsWith("pl-")) return "pl";
     return null;
   };
   const getStoredLocale = () => {
@@ -81,7 +108,6 @@ const localeRedirectScript = `(() => {
   };
   const writeStoredLocale = (locale) => {
     if (!supportedLocales.includes(locale)) return;
-
     try {
       window.localStorage.setItem(storageKey, locale);
     } catch {
@@ -90,36 +116,36 @@ const localeRedirectScript = `(() => {
   };
   const getBrowserLocale = () => {
     const browserLocales = navigator.languages?.length ? navigator.languages : [navigator.language];
+    let sawCandidate = false;
 
     for (const locale of browserLocales) {
+      if (!locale) continue;
+      sawCandidate = true;
       const supported = normalizeLocale(locale);
-
-      if (supported) {
-        return supported;
-      }
+      if (supported) return supported;
     }
 
-    return null;
+    return sawCandidate ? "en-US" : null;
   };
-  const getCurrentLocale = (pathname) => pathname === "/en" || pathname.startsWith("/en/") ? "en-US" : "zh-CN";
-  const isExplicitLocalePath = (pathname) => pathname === "/en" || pathname.startsWith("/en/");
-  const getLocalizedPath = (locale, pathname) => {
+  const getCurrentLocale = (pathname) => {
+    if (pathname === "/en" || pathname.startsWith("/en/")) return "en-US";
+    if (pathname === "/ja" || pathname.startsWith("/ja/")) return "ja";
+    if (pathname === "/pl" || pathname.startsWith("/pl/")) return "pl";
+    return "zh-CN";
+  };
+  const isExplicitLocalePath = (pathname) => prefixPattern.test(pathname);
+  const stripPrefix = (pathname) => {
     const normalizedPath = pathname.startsWith("/") ? pathname : "/" + pathname;
-
-    if (locale === "zh-CN") {
-      return normalizedPath === "/en" ? "/" : normalizedPath.replace(/^\\/en(?=\\/|$)/, "") || "/";
-    }
-
-    if (normalizedPath === "/") {
-      return "/en/";
-    }
-
-    return normalizedPath.startsWith("/en/") ? normalizedPath : "/en" + normalizedPath;
+    return normalizedPath.replace(prefixPattern, "") || "/";
+  };
+  const getLocalizedPath = (locale, pathname) => {
+    const barePath = stripPrefix(pathname);
+    const prefix = prefixes[locale] || "";
+    if (!prefix) return barePath;
+    return barePath === "/" ? prefix + "/" : prefix + barePath;
   };
   const getDesiredLocale = (pathname) => {
-    if (isExplicitLocalePath(pathname)) {
-      return null;
-    }
+    if (isExplicitLocalePath(pathname)) return null;
 
     const browserLocale = getBrowserLocale();
     const storedLocale = getStoredLocale();
@@ -159,6 +185,8 @@ const localeRedirectScript = `(() => {
     <link rel="apple-touch-icon" href={`/apple-touch-icon.png?v=${faviconVersion}`} />
     <link rel="alternate" hreflang="zh-CN" href={zhAlternateURL} />
     <link rel="alternate" hreflang="en-US" href={enAlternateURL} />
+    <link rel="alternate" hreflang="ja" href={jaAlternateURL} />
+    <link rel="alternate" hreflang="pl" href={plAlternateURL} />
     <link rel="alternate" hreflang="x-default" href={zhAlternateURL} />
     <meta name="theme-color" content="#f8fafc" />
     <meta name="generator" content={Astro.generator} />
@@ -171,8 +199,7 @@ const localeRedirectScript = `(() => {
       canonical={canonicalURL}
       noindex={noindex}
       twitter={{
-        creator: "@msh01",
-        site: "@edgeever",
+        creator: "@tianma_if",
         card: "summary_large_image",
         title: makeTitle,
         description,

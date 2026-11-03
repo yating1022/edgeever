@@ -9,6 +9,8 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "strict": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
     "noEmit": true,
     "skipLibCheck": true,
     "ignoreDeprecations": "6.0",
@@ -24,5 +26,5 @@
     "packages/**/*.ts",
     "packages/**/*.tsx"
   ],
-  "exclude": ["apps/mobile"]
+  "exclude": ["apps/mobile", "apps/ios/EditorSource"]
 }

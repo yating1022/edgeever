@@ -1,3 +1,5 @@
+import { t } from "./i18n";
+
 export type ExtensionSettings = {
   instanceUrl: string;
   token: string;
@@ -7,12 +9,23 @@ export type ExtensionSettings = {
 export type Notebook = {
   id: string;
   name: string;
+  slug?: string | null;
 };
 
 export const DEFAULT_SETTINGS: ExtensionSettings = {
   instanceUrl: "",
   token: "",
   notebookId: "",
+};
+
+const isInboxNotebook = (notebook: { id: string; slug?: string | null }) =>
+  notebook.slug === "inbox" || notebook.id === "nb_inbox" || notebook.id.endsWith("_inbox");
+
+// An empty or stale choice means 等待分类. A notebook the user picked still wins.
+export const clipNotebookId = (savedId: string, notebooks: { id: string; slug?: string | null }[]) => {
+  const saved = savedId.trim();
+  if (saved && notebooks.some((notebook) => notebook.id === saved)) return saved;
+  return notebooks.find((notebook) => notebook.id.trim() && isInboxNotebook(notebook))?.id ?? "";
 };
 
 export const getSettings = async (): Promise<ExtensionSettings> => {
@@ -38,23 +51,24 @@ export const normalizeInstanceUrl = (value: string) => {
   return withProtocol.replace(/\/+$/, "");
 };
 
-export const getInstanceOrigin = (instanceUrl: string) => {
+export const getInstancePermissionPattern = (instanceUrl: string) => {
   const url = new URL(normalizeInstanceUrl(instanceUrl));
-  return url.origin;
+  // Firefox match patterns do not support ports; requests retain the configured URL.
+  return `${url.protocol}//${url.hostname}/*`;
 };
 
 export const requestInstancePermission = async (instanceUrl: string) => {
-  const origin = getInstanceOrigin(instanceUrl);
-  const granted = await chrome.permissions.request({ origins: [`${origin}/*`] });
+  const pattern = getInstancePermissionPattern(instanceUrl);
+  const granted = await chrome.permissions.request({ origins: [pattern] });
   if (!granted) {
-    throw new Error("需要允许插件访问你的 EdgeEver 实例。");
+    throw new Error(t("instancePermissionRequired"));
   }
 };
 
 export const edgeEverRequest = async <T>(settings: ExtensionSettings, path: string, init?: RequestInit): Promise<T> => {
   const instanceUrl = normalizeInstanceUrl(settings.instanceUrl);
   if (!instanceUrl || !settings.token) {
-    throw new Error("请先在插件设置中填写 EdgeEver 地址和 API Token。");
+    throw new Error(t("missingSettingsDetails"));
   }
 
   const response = await fetch(`${instanceUrl}${path}`, {
@@ -68,10 +82,54 @@ export const edgeEverRequest = async <T>(settings: ExtensionSettings, path: stri
 
   if (!response.ok) {
     const body = await response.json().catch(() => null) as { error?: { message?: string } } | null;
-    throw new Error(body?.error?.message || `EdgeEver 请求失败（${response.status}）。`);
+    throw new Error(body?.error?.message || t("requestFailed", String(response.status)));
   }
 
   return response.json() as Promise<T>;
+};
+
+export const edgeEverFormRequest = async <T>(
+  settings: ExtensionSettings,
+  path: string,
+  form: FormData,
+  signal?: AbortSignal,
+): Promise<T> => {
+  const instanceUrl = normalizeInstanceUrl(settings.instanceUrl);
+  if (!instanceUrl || !settings.token) {
+    throw new Error(t("missingSettingsDetails"));
+  }
+
+  const response = await fetch(`${instanceUrl}${path}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${settings.token}` },
+    body: form,
+    signal,
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as { error?: { message?: string } } | null;
+    throw new Error(body?.error?.message || t("requestFailed", String(response.status)));
+  }
+
+  return response.json() as Promise<T>;
+};
+
+export const uploadMemoImage = async (
+  settings: ExtensionSettings,
+  memoId: string,
+  file: { bytes: Uint8Array; mimeType: string; filename: string },
+  signal?: AbortSignal,
+) => {
+  const buffer = new ArrayBuffer(file.bytes.byteLength);
+  new Uint8Array(buffer).set(file.bytes);
+  const form = new FormData();
+  form.append("file", new File([buffer], file.filename, { type: file.mimeType }));
+  return edgeEverFormRequest<{ resource: { id: string } }>(
+    settings,
+    `/api/v1/memos/${encodeURIComponent(memoId)}/resources`,
+    form,
+    signal,
+  );
 };
 
 export const listNotebooks = (settings: ExtensionSettings) =>

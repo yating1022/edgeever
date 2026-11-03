@@ -1,7 +1,7 @@
 ---
 draft: false
-title: "从印象笔记迁移到 EdgeEver 指南"
-snippet: "通过 EdgeEver MCP、evernote-backup 和 ENEX 导入脚本，把你拥有的笔记资料迁移到自托管实例。"
+title: "从印象笔记迁移到自托管笔记应用：EdgeEver ENEX 完整指南"
+snippet: "通过 ENEX、evernote-backup 与 EdgeEver MCP，完整迁移笔记、附件、时间信息和嵌套笔记本。"
 image: {
     src: "/images/evernote-migration.jpg",
     alt: "从印象笔记迁移到 EdgeEver"
@@ -15,6 +15,14 @@ tags: [evernote, migration, self-hosted, mcp]
 > EdgeEver 与印象笔记、Evernote 无关联。本指南仅用于说明用户如何将自己拥有的数据迁移到 EdgeEver。印象笔记和 Evernote 是其各自权利人的商标。
 
 我们推荐使用 AI 编程助手（如 Antigravity、Claude Code、Cursor 等）自动执行迁移。核心仓库迁移指南说明：该方案已完成内存流式优化与空文本预处理，能应对数 GB 级别超大笔记库，并保留创建/修改时间与嵌套笔记本目录层级。
+
+如果还在比较「自托管印象笔记替代方案」，可先看 [EdgeEver 品类说明](/self-hosted-evernote-alternative)，再按下面步骤搬家。
+
+### 常见问题
+
+- **会保留笔记本、附件和时间吗？** 文档化流程会保留创建/修改时间与嵌套笔记本层级。导入后请抽查带图片的笔记。
+- **必须用 AI 助手吗？** 推荐，但不是唯一路径。也可以下载 `scripts/import-evernote-enex-via-mcp.mjs`，按脚本注释手动执行。
+- **和印象笔记官方有关系吗？** 没有。本指南只处理你自己拥有的数据。
 
 ---
 

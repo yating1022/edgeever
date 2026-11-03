@@ -2,15 +2,21 @@ import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  SETTINGS_CARD_HEADER_CLASSNAME,
+  SETTINGS_CARD_ICON_CLASSNAME,
+  SETTINGS_CARD_TITLE_CLASSNAME,
+} from "./settings-ui";
 import { Input } from "@/components/ui/input";
 import { ApiRequestError, api } from "@/lib/api";
 
 interface PasswordCardProps {
   authRequired: boolean;
+  demoMode: boolean;
 }
 
-export const PasswordCard = ({ authRequired }: PasswordCardProps) => {
+export const PasswordCard = ({ authRequired, demoMode }: PasswordCardProps) => {
   const { t } = useTranslation();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -57,18 +63,23 @@ export const PasswordCard = ({ authRequired }: PasswordCardProps) => {
 
   return (
     <Card className="w-full min-w-0 overflow-hidden shadow-none">
-      <CardHeader className="p-4">
-        <CardTitle className="flex items-center gap-2 text-sm">
-          <KeyRound className="h-4 w-4 text-emerald-700" />
+      <CardHeader className={SETTINGS_CARD_HEADER_CLASSNAME}>
+        <CardTitle className={SETTINGS_CARD_TITLE_CLASSNAME}>
+          <KeyRound className={SETTINGS_CARD_ICON_CLASSNAME} />
           {t("password.title")}
         </CardTitle>
-        <CardDescription>{t("password.description")}</CardDescription>
       </CardHeader>
       <CardContent className="p-4 pt-0">
-        <form className="grid gap-3" onSubmit={handleSubmit}>
-          <label className="grid gap-1.5 text-sm font-medium text-slate-700">
+        {demoMode ? (
+          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900" role="status">
+            {t("password.demoReadOnly")}
+          </p>
+        ) : (
+          <form className="grid gap-3 lg:grid-cols-3 lg:gap-y-2.5" onSubmit={handleSubmit}>
+          <label className="grid gap-1.5 text-xs font-normal leading-5 text-slate-700">
             {t("password.currentPassword")}
             <Input
+              className="lg:h-9"
               type="password"
               autoComplete="current-password"
               value={currentPassword}
@@ -76,9 +87,10 @@ export const PasswordCard = ({ authRequired }: PasswordCardProps) => {
               required
             />
           </label>
-          <label className="grid gap-1.5 text-sm font-medium text-slate-700">
+          <label className="grid gap-1.5 text-xs font-normal leading-5 text-slate-700">
             {t("password.newPassword")}
             <Input
+              className="lg:h-9"
               type="password"
               autoComplete="new-password"
               minLength={8}
@@ -87,9 +99,10 @@ export const PasswordCard = ({ authRequired }: PasswordCardProps) => {
               required
             />
           </label>
-          <label className="grid gap-1.5 text-sm font-medium text-slate-700">
+          <label className="grid gap-1.5 text-xs font-normal leading-5 text-slate-700">
             {t("password.confirmPassword")}
             <Input
+              className="lg:h-9"
               type="password"
               autoComplete="new-password"
               minLength={8}
@@ -98,18 +111,19 @@ export const PasswordCard = ({ authRequired }: PasswordCardProps) => {
               required
             />
           </label>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between lg:col-span-3">
             <p
               className={feedback?.type === "error" ? "text-xs font-medium text-rose-600" : "text-xs font-medium text-emerald-700"}
               role={feedback ? "status" : undefined}
             >
               {feedback?.message}
             </p>
-            <Button className="w-full bg-emerald-600 text-white hover:bg-emerald-700 sm:w-auto" type="submit" disabled={isSubmitting}>
+            <Button className="w-full sm:w-auto lg:h-9 lg:px-3" variant="solid" type="submit" disabled={isSubmitting}>
               {isSubmitting ? t("password.changing") : t("password.change")}
             </Button>
           </div>
-        </form>
+          </form>
+        )}
       </CardContent>
     </Card>
   );

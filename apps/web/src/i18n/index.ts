@@ -10,7 +10,6 @@ import {
   type AppLocalePreference,
   type SupportedLocale,
 } from "./locales";
-import { enUS } from "./resources/en-US";
 import { zhCN } from "./resources/zh-CN";
 
 export {
@@ -24,14 +23,48 @@ export {
 
 export const resources = {
   "zh-CN": { translation: zhCN },
-  "en-US": { translation: enUS },
 } as const;
+
+type OptionalLocale = Exclude<SupportedLocale, keyof typeof resources>;
+
+const isOptionalLocale = (locale: SupportedLocale): locale is OptionalLocale =>
+  locale === "en-US" || locale === "ja" || locale === "pl" || locale === "ru";
+
+const loadOptionalCatalog = async (locale: OptionalLocale) => {
+  if (locale === "en-US") {
+    return (await import("./resources/en-US")).enUS;
+  }
+  if (locale === "ja") {
+    return (await import("./resources/ja")).ja;
+  }
+  if (locale === "pl") {
+    return (await import("./resources/pl")).pl;
+  }
+  return (await import("./resources/ru")).ru;
+};
+
+const ensureLocaleCatalog = async (locale: SupportedLocale) => {
+  if (!isOptionalLocale(locale) || i18n.hasResourceBundle(locale, "translation")) {
+    return;
+  }
+
+  if (locale !== "en-US") {
+    await ensureLocaleCatalog("en-US");
+  }
+  i18n.addResourceBundle(locale, "translation", await loadOptionalCatalog(locale), true, true);
+};
 
 void i18n.use(initReactI18next).init({
   resources,
-  lng: getInitialLocale(),
-  fallbackLng: defaultLocale,
+  lng: isOptionalLocale(getInitialLocale()) ? defaultLocale : getInitialLocale(),
+  fallbackLng: {
+    ja: ["en-US"],
+    pl: ["en-US"],
+    ru: ["en-US"],
+    default: [defaultLocale],
+  },
   supportedLngs: supportedLocales,
+  partialBundledLanguages: true,
   interpolation: {
     escapeValue: false,
   },
@@ -48,15 +81,28 @@ i18n.on("languageChanged", (locale) => {
 
 document.documentElement.lang = i18n.resolvedLanguage ?? i18n.language ?? defaultLocale;
 
-export const changeAppLocale = (locale: SupportedLocale) => {
+export const bootstrapI18n = async () => {
+  const locale = getInitialLocale();
+  if (!isOptionalLocale(locale)) {
+    return;
+  }
+
+  await ensureLocaleCatalog(locale);
+  await i18n.changeLanguage(locale);
+};
+
+export const changeAppLocale = async (locale: SupportedLocale) => {
   writeStoredLocale(locale);
+  await ensureLocaleCatalog(locale);
   return i18n.changeLanguage(locale);
 };
 
-export const changeAppLocalePreference = (preference: AppLocalePreference) => {
+export const changeAppLocalePreference = async (preference: AppLocalePreference) => {
   if (preference === "system") {
     clearStoredLocale();
-    return i18n.changeLanguage(getBrowserLocale() ?? defaultLocale);
+    const locale = getBrowserLocale() ?? defaultLocale;
+    await ensureLocaleCatalog(locale);
+    return i18n.changeLanguage(locale);
   }
 
   return changeAppLocale(preference);

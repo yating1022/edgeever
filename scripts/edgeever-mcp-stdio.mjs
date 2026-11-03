@@ -3,6 +3,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import { createMcpHttpHeaders } from "./mcp-http-headers.mjs";
 
 const CONFIG_PATH = process.env.EDGEEVER_CONFIG || join(homedir(), ".edgeever", "config.json");
 const DEFAULT_URL = "http://127.0.0.1:8787";
@@ -33,6 +34,7 @@ try {
 
 let inputBuffer = Buffer.alloc(0);
 let transportMode = null;
+let negotiatedProtocolVersion = null;
 
 process.stdin.on("data", (chunk) => {
   inputBuffer = Buffer.concat([inputBuffer, chunk]);
@@ -103,16 +105,24 @@ async function handleMessage(payload) {
 }
 
 async function forwardToEdgeEver(request) {
+  if (request?.method === "initialize") {
+    negotiatedProtocolVersion = request?.params?.protocolVersion || "2025-11-25";
+  }
+
+  const requestHeaders = createMcpHttpHeaders(request, negotiatedProtocolVersion);
+
   const response = await fetch(`${client.baseUrl}/mcp`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${client.token}`,
+      Accept: "application/json, text/event-stream",
       "Content-Type": "application/json",
+      ...requestHeaders,
     },
     body: JSON.stringify(request),
   });
 
-  if (response.status === 204) {
+  if (response.status === 202 || response.status === 204) {
     return null;
   }
 
@@ -122,14 +132,22 @@ async function forwardToEdgeEver(request) {
     throw new Error(`${response.status} ${response.statusText}`);
   }
 
+  if (request?.method === "initialize" && body?.result?.protocolVersion) {
+    negotiatedProtocolVersion = body.result.protocolVersion;
+  }
+
   return body;
 }
 
 async function createClient(profileName) {
-  const config = await readConfig();
+  const directUrl = process.env.EDGEEVER_URL;
+  const directToken = process.env.EDGEEVER_TOKEN;
+  // ACP supplies both values for its short-lived local bridge. In that mode,
+  // do not read an unrelated MCP profile from the user's home directory.
+  const config = directUrl && directToken ? {} : await readConfig();
   const profile = profileName ? config.profiles?.[profileName] : undefined;
-  const baseUrl = (process.env.EDGEEVER_URL || profile?.url || DEFAULT_URL).replace(/\/+$/, "");
-  const token = process.env.EDGEEVER_TOKEN || profile?.token;
+  const baseUrl = (directUrl || profile?.url || DEFAULT_URL).replace(/\/+$/, "");
+  const token = directToken || profile?.token;
 
   if (!token) {
     throw new Error("EDGEEVER_TOKEN is required, or configure a profile with `bun run cli -- profile set`.");

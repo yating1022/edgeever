@@ -1,4 +1,9 @@
 import type { TiptapDoc } from "./content";
+import type { AiAction, AiPromptParameterKind, AiPromptResultMode } from "./ai-assistant";
+import type { DiagramKind, DiagramSummaryPreview } from "./diagram";
+import type { TableSummaryPreview } from "./table";
+
+export type NoteCreateKind = DiagramKind | "infographic" | "table" | "poster";
 
 export type Notebook = {
   id: string;
@@ -7,6 +12,12 @@ export type Notebook = {
   slug: string | null;
   icon: string | null;
   color: string | null;
+  textColor?: string | null;
+  /** Older clients omit this; defaults to coloring the icon. */
+  colorTarget?: "icon" | "name" | "both";
+  isBold?: boolean;
+  iconInverted?: boolean;
+  rowInverted?: boolean;
   sortOrder: number;
   memoCount: number;
   lastMemoUpdatedAt: string | null;
@@ -19,6 +30,13 @@ export type MemoSummary = {
   notebookId: string;
   title: string | null;
   excerpt: string;
+  diagramKind?: DiagramKind | null;
+  diagramPreview?: DiagramSummaryPreview;
+  structuredTable?: boolean;
+  tablePreview?: TableSummaryPreview;
+  infographic?: boolean;
+  poster?: boolean;
+  videoNote?: boolean;
   tags: string[];
   isPinned: boolean;
   isArchived: boolean;
@@ -37,6 +55,71 @@ export type MemoDetail = MemoSummary & {
   sourceMemoIds: string[];
   mergeSourceCount: number;
   mergedIntoMemoId: string | null;
+};
+
+export type MemoTemplate = {
+  id: string;
+  name: string;
+  description: string | null;
+  title: string | null;
+  contentJson: TiptapDoc;
+  contentMarkdown: string;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type WorkspaceExtensionSourceKind = "marketplace" | "github" | "manifest";
+
+export type WorkspaceExtension = {
+  extensionId: string;
+  type: "plugin" | "theme";
+  version: string;
+  enabled: boolean;
+  installedAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+  manifestUrl: string;
+  sourceKind: WorkspaceExtensionSourceKind;
+  verified: boolean;
+  repositoryUrl: string | null;
+  releaseTag: string | null;
+  publisher: "edgeever" | null;
+};
+
+export type ScheduledTaskMissedRunPolicy = "run-once" | "skip";
+
+export type ScheduledPluginCommandPayload = {
+  pluginId: string;
+  commandId: string;
+};
+
+export type ScheduledTask = {
+  id: string;
+  name: string;
+  taskType: "plugin-command";
+  taskPayload: ScheduledPluginCommandPayload;
+  ownerPluginId: string | null;
+  pluginScheduleKey: string | null;
+  cronExpression: string;
+  timezone: string;
+  executorDeviceId: string;
+  missedRunPolicy: ScheduledTaskMissedRunPolicy;
+  isEnabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastRun: ScheduledTaskRun | null;
+};
+
+export type ScheduledTaskRun = {
+  id: string;
+  taskId: string;
+  scheduledFor: string;
+  executorDeviceId: string;
+  status: "running" | "succeeded" | "failed";
+  errorMessage: string | null;
+  startedAt: string;
+  finishedAt: string | null;
 };
 
 export type MemoEditSession = {
@@ -91,6 +174,111 @@ export type ResourceStorageSummary = {
   attachmentCount: number;
 };
 
+export type ObjectStorageSettings = {
+  provider: "builtin" | "s3";
+  displayName: string;
+  endpoint: string | null;
+  region: string | null;
+  bucket: string | null;
+  accessKeyId: string | null;
+  hasSecretAccessKey: boolean;
+  forcePathStyle: boolean;
+  objectPrefix: string;
+  encryptionConfigured: boolean;
+};
+
+export type AiProvider = "openai-compatible" | "anthropic" | "google";
+
+export type AiTranscriptionStandard = "openai-compatible";
+
+export type AiModelConfig = {
+  id: string;
+  providerConfigId: string;
+  modelId: string;
+  displayName: string;
+};
+
+export type AiProviderConfig = {
+  id: string;
+  provider: AiProvider;
+  displayName: string;
+  baseUrl: string;
+  isEnabled: boolean;
+  hasApiKey: boolean;
+  models: AiModelConfig[];
+  credentialsUnavailable?: boolean;
+};
+
+export type AiSettings = {
+  providers: AiProviderConfig[];
+  defaultModelId: string | null;
+  encryptionConfigured: boolean;
+  readOnly: boolean;
+};
+
+export type AiTranscriptionModel = {
+  id: string;
+  providerId: string;
+  modelId: string;
+  displayName: string;
+};
+
+export type AiTranscriptionProvider = {
+  id: string;
+  provider: AiTranscriptionStandard;
+  displayName: string;
+  baseUrl: string;
+  isEnabled: boolean;
+  hasApiKey: boolean;
+  models: AiTranscriptionModel[];
+  credentialsUnavailable?: boolean;
+};
+
+export type AiTranscriptionSettings = {
+  providers: AiTranscriptionProvider[];
+  defaultModelId: string | null;
+  enabled: boolean;
+  encryptionConfigured: boolean;
+  readOnly: boolean;
+};
+
+export type AiPromptTemplate = {
+  id: string;
+  origin: "default" | "custom";
+  seedKey: Exclude<AiAction, "custom"> | null;
+  action: AiAction;
+  parameterKind: AiPromptParameterKind;
+  resultMode: AiPromptResultMode;
+  nameCustomized: boolean;
+  descriptionCustomized: boolean;
+  instructionCustomized: boolean;
+  name: string;
+  description: string | null;
+  instruction: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AiDiscoveredModel = {
+  modelId: string;
+  displayName: string;
+};
+
+export type AiStreamEvent =
+  | { type: "start" }
+  | { type: "text-delta"; text: string }
+  | { type: "finish"; finishReason?: string; inputTokens?: number; outputTokens?: number }
+  | { type: "error"; code: string; message: string };
+
+export type AiTagSuggestion = {
+  name: string;
+  existing: boolean;
+};
+
+export type AiTagSuggestionsResponse = {
+  suggestions: AiTagSuggestion[];
+};
+
 export type ApiToken = {
   id: string;
   name: string;
@@ -117,13 +305,34 @@ export type AuthUser = {
   id: string;
   username: string;
   displayName: string | null;
+  role: "owner" | "member";
+};
+
+export type InstanceUser = AuthUser & {
+  isDisabled: boolean;
+  lastLoginAt: string | null;
+  createdAt: string;
 };
 
 export type AuthSession = {
   authRequired: boolean;
   authenticated: boolean;
+  demoMode: boolean;
   user: AuthUser | null;
   sessionToken?: string;
+};
+
+export type LoginDeviceSession = {
+  id: string;
+  userAgent: string | null;
+  label: string | null;
+  ipAddress: string | null;
+  ipCountry: string | null;
+  ipRegion: string | null;
+  isCurrent: boolean;
+  createdAt: string;
+  lastSeenAt: string;
+  expiresAt: string;
 };
 
 export type ApiError = {

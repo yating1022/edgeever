@@ -3,6 +3,8 @@ import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
 export type NotebookNode = Notebook & {
+  // memoCount holds the subtree total; this keeps the notebook's own count.
+  directMemoCount: number;
   children: NotebookNode[];
 };
 
@@ -16,7 +18,7 @@ export const buildNotebookTree = (notebooks: Notebook[], compareNodes: NotebookN
   const nodes = new Map<string, NotebookNode>();
 
   for (const notebook of notebooks) {
-    nodes.set(notebook.id, { ...notebook, children: [] });
+    nodes.set(notebook.id, { ...notebook, directMemoCount: notebook.memoCount, children: [] });
   }
 
   const roots: NotebookNode[] = [];
@@ -29,12 +31,23 @@ export const buildNotebookTree = (notebooks: Notebook[], compareNodes: NotebookN
     }
   }
 
-  const sortNodes = (items: NotebookNode[]) => {
+  const rollUpAndSortNodes = (items: NotebookNode[]) => {
+    for (const item of items) {
+      rollUpAndSortNodes(item.children);
+
+      for (const child of item.children) {
+        item.memoCount += child.memoCount;
+
+        if (child.lastMemoUpdatedAt && (!item.lastMemoUpdatedAt || child.lastMemoUpdatedAt > item.lastMemoUpdatedAt)) {
+          item.lastMemoUpdatedAt = child.lastMemoUpdatedAt;
+        }
+      }
+    }
+
     items.sort(compareNodes);
-    items.forEach((item) => sortNodes(item.children));
   };
 
-  sortNodes(roots);
+  rollUpAndSortNodes(roots);
   return roots;
 };
 
@@ -48,6 +61,6 @@ export const formatDateTime = (value: string) =>
 
 export const parseTagsText = (value: string) =>
   value
-    .split(/[,，\s]+/)
+    .split(/[,，\n]+/)
     .map((tag) => tag.trim().replace(/^#/, ""))
     .filter(Boolean);
